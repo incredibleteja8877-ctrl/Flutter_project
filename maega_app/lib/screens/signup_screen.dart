@@ -1,68 +1,61 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../data/app_data.dart';
-import 'profile_screen.dart';
-import 'signup_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _obscure = true;
+  final _confirmCtrl = TextEditingController();
+  bool _obscurePass = true;
+  bool _obscureConfirm = true;
   String? _error;
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  void _signup() {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
 
-    final email = _emailCtrl.text.trim();
+    final email = _emailCtrl.text.trim().toLowerCase();
     final password = _passwordCtrl.text;
+    final name = _nameCtrl.text.trim();
 
-    Map<String, String>? userData;
-
-    if (email == kDemoEmail && password == kDemoPassword) {
-      userData = {
-        'name': 'Jhon Doe',
-        'phone': '+91 9876543210',
-        'email': 'you@example.com',
-        'avatarAsset': kAvatarAsset,
-      };
-    } else {
-      final stored = usersBox.get(email.toLowerCase());
-      if (stored != null && stored['password'] == password) {
-        userData = {
-          'name': stored['name'] as String? ?? '',
-          'phone': stored['phone'] as String? ?? '',
-          'email': stored['email'] as String? ?? email,
-          'avatarAsset': '',
-        };
-      }
+    if (email == kDemoEmail.toLowerCase()) {
+      setState(() => _error = 'This email is already registered.');
+      return;
     }
 
-    if (userData != null) {
-      await profileBox.putAll(userData);
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ProfileScreen()),
-      );
-    } else {
-      setState(() => _error = 'Invalid email or password.');
+    final box = usersBox;
+    if (box.containsKey(email)) {
+      setState(() => _error = 'An account with this email already exists.');
+      return;
     }
+
+    box.put(email, {'name': name, 'email': email, 'password': password, 'phone': ''});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Account created! Please log in.'),
+        backgroundColor: kRed,
+      ),
+    );
+    Navigator.pop(context);
   }
 
   @override
@@ -94,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
                   const Text(
-                    'Welcome back',
+                    'Create account',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -103,10 +96,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Login to continue',
+                    'Sign up to get started',
                     style: TextStyle(fontSize: 14, color: kTextGrey),
                   ),
                   const SizedBox(height: 28),
+                  TextFormField(
+                    controller: _nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _fieldDecoration(
+                      label: 'Full Name',
+                      icon: Icons.person_outline,
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Enter your name' : null,
+                  ),
+                  const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
@@ -114,26 +118,57 @@ class _LoginScreenState extends State<LoginScreen> {
                       label: 'Email',
                       icon: Icons.email_outlined,
                     ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Enter your email' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Enter your email';
+                      if (!v.contains('@')) return 'Enter a valid email';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordCtrl,
-                    obscureText: _obscure,
+                    obscureText: _obscurePass,
                     decoration: _fieldDecoration(
                       label: 'Password',
                       icon: Icons.lock_outline,
                       suffix: IconButton(
                         icon: Icon(
-                          _obscure ? Icons.visibility_off : Icons.visibility,
+                          _obscurePass ? Icons.visibility_off : Icons.visibility,
                           color: kTextGrey,
                         ),
-                        onPressed: () => setState(() => _obscure = !_obscure),
+                        onPressed: () =>
+                            setState(() => _obscurePass = !_obscurePass),
                       ),
                     ),
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Enter your password' : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Enter a password';
+                      if (v.length < 6) return 'Password must be at least 6 characters';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmCtrl,
+                    obscureText: _obscureConfirm,
+                    decoration: _fieldDecoration(
+                      label: 'Confirm Password',
+                      icon: Icons.lock_outline,
+                      suffix: IconButton(
+                        icon: Icon(
+                          _obscureConfirm
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: kTextGrey,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
+                      ),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Confirm your password';
+                      if (v != _passwordCtrl.text) return 'Passwords do not match';
+                      return null;
+                    },
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -146,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _login,
+                      onPressed: _signup,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kRed,
                         foregroundColor: Colors.white,
@@ -156,28 +191,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       child: const Text(
-                        'Login',
-                        style:
-                            TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        'Sign Up',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        "Don't have an account?",
+                        'Already have an account?',
                         style: TextStyle(color: kTextGrey, fontSize: 14),
                       ),
                       TextButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const SignupScreen()),
-                        ),
+                        onPressed: () => Navigator.pop(context),
                         child: const Text(
-                          'Sign Up',
+                          'Login',
                           style: TextStyle(
                             color: kRed,
                             fontSize: 14,
@@ -186,18 +217,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFBEAEE),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Demo credentials\nEmail: admin@maega.com\nPassword: 123456',
-                      style: TextStyle(fontSize: 12, color: kTextGrey),
-                    ),
                   ),
                 ],
               ),
